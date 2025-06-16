@@ -1,0 +1,14 @@
+# Environment variables
+.env
+
+# Firebase service account
+serviceAccountKey.json
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Uploads directory
+public/uploads/ 
