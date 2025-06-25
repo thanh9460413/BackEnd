@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const cron= require('node-cron');
+const cron = require('node-cron');
 const http = require('http');
 const { Server } = require('socket.io');
 const sql = require('mssql');
@@ -35,7 +35,8 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER,
   database: process.env.DB_DATABASE,
-  options: { encrypt: false }
+  options: { encrypt: false, trustServerCertificate: false }
+
 };
 
 // ✅ Kết nối SQL
@@ -230,67 +231,67 @@ app.post('/groups/create', authenticateToken, upload.single('avatar'), async (re
 
 // 📌 API: Send Message (with image)
 app.post('/messages', authenticateToken, upload.single('media'), async (req, res) => {
-    const { chat_id, content } = req.body;
-    const sender_id = req.user.userId;
-    const server_id = req.user.server_id;
+  const { chat_id, content } = req.body;
+  const sender_id = req.user.userId;
+  const server_id = req.user.server_id;
 
-    let mediaUrl = null;
+  let mediaUrl = null;
 
-    if (req.file) {
-        try {
-            // Tạo thư mục uploads nếu chưa tồn tại
-            const uploadsDir = path.join(__dirname, 'public/uploads');
-            if (!fs.existsSync(uploadsDir)) {
-                fs.mkdirSync(uploadsDir, { recursive: true });
-            }
+  if (req.file) {
+    try {
+      // Tạo thư mục uploads nếu chưa tồn tại
+      const uploadsDir = path.join(__dirname, 'public/uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
 
-            // Lưu ảnh vào thư mục uploads với tên file bao gồm server_id
-            const fileName = `server_${server_id}_${Date.now()}_${req.file.originalname}`;
-            const filePath = path.join(uploadsDir, fileName);
-            fs.writeFileSync(filePath, req.file.buffer);
-            
-            // Tạo URL đầy đủ cho ảnh
-            const baseUrl = `${req.protocol}://${req.get('host')}`;
-            mediaUrl = `${baseUrl}/uploads/${fileName}`;
+      // Lưu ảnh vào thư mục uploads với tên file bao gồm server_id
+      const fileName = `server_${server_id}_${Date.now()}_${req.file.originalname}`;
+      const filePath = path.join(uploadsDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
 
-            // Lưu tin nhắn vào SQL Server
-            await sql.query`
+      // Tạo URL đầy đủ cho ảnh
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      mediaUrl = `${baseUrl}/uploads/${fileName}`;
+
+      // Lưu tin nhắn vào SQL Server
+      await sql.query`
                 INSERT INTO Messages (chat_id, sender_id, server_id, content, image_url)
                 VALUES (${chat_id}, ${sender_id}, ${server_id}, ${content}, ${mediaUrl})
             `;
 
-            const newMessage = {
-                chat_id,
-                sender_id,
-                server_id,
-                content,
-                image_url: mediaUrl,
-                created_at: new Date().toISOString(),
-            };
+      const newMessage = {
+        chat_id,
+        sender_id,
+        server_id,
+        content,
+        image_url: mediaUrl,
+        created_at: new Date().toISOString(),
+      };
 
-            res.status(201).json(newMessage);
-        } catch (error) {
-            console.error("Error saving image:", error);
-            return res.status(500).json({ error: "Không thể lưu ảnh" });
-        }
-    } else {
-        // Nếu không có file, vẫn lưu tin nhắn mà không có hình ảnh
-        await sql.query`
+      res.status(201).json(newMessage);
+    } catch (error) {
+      console.error("Error saving image:", error);
+      return res.status(500).json({ error: "Không thể lưu ảnh" });
+    }
+  } else {
+    // Nếu không có file, vẫn lưu tin nhắn mà không có hình ảnh
+    await sql.query`
             INSERT INTO Messages (chat_id, sender_id, server_id, content, image_url)
             VALUES (${chat_id}, ${sender_id}, ${server_id}, ${content}, NULL)
         `;
 
-        const newMessage = {
-            chat_id,
-            sender_id,
-            server_id,
-            content,
-            image_url: null,
-            created_at: new Date().toISOString(),
-        };
+    const newMessage = {
+      chat_id,
+      sender_id,
+      server_id,
+      content,
+      image_url: null,
+      created_at: new Date().toISOString(),
+    };
 
-        res.status(201).json(newMessage);
-    }
+    res.status(201).json(newMessage);
+  }
 });
 
 
@@ -468,7 +469,7 @@ app.get('/users/:server_id', authenticateToken, async (req, res) => {
   const server_id = req.params.server_id;
 
   try {
-    if ( !server_id) {
+    if (!server_id) {
       return res.status(400).json({ error: 'User ID and Server ID are required' });
     }
 
@@ -533,9 +534,9 @@ app.post('/user/register', authenticateToken, upload.none(), async (req, res) =>
 
     // Validate required fields
     if (!username || !password || !name || !server_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng điền đầy đủ thông tin' 
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng điền đầy đủ thông tin'
       });
     }
 
@@ -546,9 +547,9 @@ app.post('/user/register', authenticateToken, upload.none(), async (req, res) =>
     `;
 
     if (existingUser.recordset.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Tên đăng nhập đã tồn tại' 
+      return res.status(400).json({
+        success: false,
+        message: 'Tên đăng nhập đã tồn tại'
       });
     }
 
@@ -562,21 +563,21 @@ app.post('/user/register', authenticateToken, upload.none(), async (req, res) =>
     `;
 
     if (result.rowsAffected[0] > 0) {
-      res.json({ 
-        success: true, 
-        message: 'Đã thêm người dùng mới' 
+      res.json({
+        success: true,
+        message: 'Đã thêm người dùng mới'
       });
     } else {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Không thể thêm người dùng' 
+      res.status(500).json({
+        success: false,
+        message: 'Không thể thêm người dùng'
       });
     }
   } catch (error) {
     console.error('Error registering user:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Có lỗi xảy ra khi thêm người dùng' 
+    res.status(500).json({
+      success: false,
+      message: 'Có lỗi xảy ra khi thêm người dùng'
     });
   }
 });
@@ -588,9 +589,9 @@ app.post('/users/create-admin', authenticateToken, async (req, res) => {
 
     // Validate required fields
     if (!username?.trim() || !password?.trim() || !name?.trim() || !server_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng nhập đầy đủ thông tin và chọn server' 
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ thông tin và chọn server'
       });
     }
 
@@ -601,9 +602,9 @@ app.post('/users/create-admin', authenticateToken, async (req, res) => {
     `;
 
     if (existingUser.recordset.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Tên đăng nhập đã tồn tại trong server này' 
+      return res.status(400).json({
+        success: false,
+        message: 'Tên đăng nhập đã tồn tại trong server này'
       });
     }
 
@@ -617,21 +618,21 @@ app.post('/users/create-admin', authenticateToken, async (req, res) => {
     `;
 
     if (result.rowsAffected[0] > 0) {
-      res.json({ 
-        success: true, 
-        message: 'Admin đã được tạo thành công' 
+      res.json({
+        success: true,
+        message: 'Admin đã được tạo thành công'
       });
     } else {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Không thể tạo admin' 
+      res.status(500).json({
+        success: false,
+        message: 'Không thể tạo admin'
       });
     }
   } catch (error) {
     console.error('Error creating admin:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Không thể tạo admin' 
+    res.status(500).json({
+      success: false,
+      message: 'Không thể tạo admin'
     });
   }
 });
@@ -659,18 +660,18 @@ app.post('/servers/create', authenticateToken, async (req, res) => {
 
     // Validate required fields
     if (!name || !name.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng nhập tên server' 
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập tên server'
       });
     }
 
     // Validate time format (HH:mm)
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!timeRegex.test(time_delete)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Định dạng thời gian không hợp lệ. Sử dụng HH:mm' 
+      return res.status(400).json({
+        success: false,
+        message: 'Định dạng thời gian không hợp lệ. Sử dụng HH:mm'
       });
     }
 
@@ -681,9 +682,9 @@ app.post('/servers/create', authenticateToken, async (req, res) => {
     `;
 
     if (existingServer.recordset.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Tên server đã tồn tại' 
+      return res.status(400).json({
+        success: false,
+        message: 'Tên server đã tồn tại'
       });
     }
 
@@ -703,21 +704,21 @@ app.post('/servers/create', authenticateToken, async (req, res) => {
     `;
 
     if (result.rowsAffected[0] > 0) {
-      res.json({ 
-        success: true, 
-        message: 'Server đã được tạo thành công' 
+      res.json({
+        success: true,
+        message: 'Server đã được tạo thành công'
       });
     } else {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Không thể tạo server' 
+      res.status(500).json({
+        success: false,
+        message: 'Không thể tạo server'
       });
     }
   } catch (error) {
     console.error('Error creating server:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Không thể tạo server' 
+    res.status(500).json({
+      success: false,
+      message: 'Không thể tạo server'
     });
   }
 });
@@ -742,9 +743,9 @@ app.get('/server/:serverName/admin', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching server admins:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch server admins' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch server admins'
     });
   }
 });
@@ -753,7 +754,7 @@ app.get('/server/:serverName/admin', authenticateToken, async (req, res) => {
 cron.schedule('* * * * *', async () => { // Chạy mỗi phút để kiểm tra
   try {
     const pool = await sql.connect(dbConfig);
-    
+
     // Lấy danh sách server và thời gian xóa của chúng
     const serverResult = await pool.request().query('SELECT id, name, time_delete FROM Servers');
     const servers = serverResult.recordset;
@@ -853,7 +854,7 @@ app.get('/chat/:chatId/members', authenticateToken, async (req, res) => {
     const request = new sql.Request();
     request.input('groupId', sql.Int, groupId);
     request.input('serverId', sql.Int, parseInt(serverId));
-    
+
     const membersResult = await request.query(`
       SELECT 
         u.id,
@@ -926,7 +927,7 @@ app.post('/chat/:chatId/remove-user', authenticateToken, async (req, res) => {
     const request = pool.request();
     request.input('groupId', sql.Int, groupId);
     request.input('userId', sql.Int, userIdToRemove);
-    
+
     const removeResult = await request.query(
       'DELETE FROM GroupMembers WHERE group_id = @groupId AND user_id = @userId'
     );
@@ -935,9 +936,9 @@ app.post('/chat/:chatId/remove-user', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User is not a member of this group' });
     }
 
-    res.json({ 
-      success: true, 
-      message: 'User removed from group successfully' 
+    res.json({
+      success: true,
+      message: 'User removed from group successfully'
     });
   } catch (error) {
     console.error('Error removing user from group:', error);
@@ -952,18 +953,18 @@ app.post('/groups/add-members', authenticateToken, async (req, res) => {
     const serverId = req.user.server_id;
 
     if (!chat_id || !members) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields' 
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
       });
     }
 
     // Convert chat_id to integer23w
     const chatId = parseInt(chat_id);
     if (isNaN(chatId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid chat ID' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid chat ID'
       });
     }
 
@@ -978,17 +979,17 @@ app.post('/groups/add-members', authenticateToken, async (req, res) => {
     `;
 
     if (chatRoomResult.recordset.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Group chat not found or you do not have permission' 
+      return res.status(404).json({
+        success: false,
+        message: 'Group chat not found or you do not have permission'
       });
     }
 
     const groupId = parseInt(chatRoomResult.recordset[0].group_id);
     if (isNaN(groupId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid group ID' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID'
       });
     }
 
@@ -1000,9 +1001,9 @@ app.post('/groups/add-members', authenticateToken, async (req, res) => {
         throw new Error('Invalid member IDs');
       }
     } catch (error) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid members format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid members format'
       });
     }
 
@@ -1028,9 +1029,9 @@ app.post('/groups/add-members', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error adding members to group:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to add members to group' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add members to group'
     });
   }
 });
@@ -1041,21 +1042,21 @@ app.put('/servers/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { name, time_delete } = req.body;
 
-    
+
     // Validate required fields
     if (!name || !time_delete) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Tên server và thời gian xóa tin nhắn là bắt buộc' 
+      return res.status(400).json({
+        success: false,
+        message: 'Tên server và thời gian xóa tin nhắn là bắt buộc'
       });
     }
 
     // Validate time format (HH:mm)
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!timeRegex.test(time_delete)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Định dạng thời gian không hợp lệ. Sử dụng HH:mm' 
+      return res.status(400).json({
+        success: false,
+        message: 'Định dạng thời gian không hợp lệ. Sử dụng HH:mm'
       });
     }
 
@@ -1075,22 +1076,22 @@ app.put('/servers/:id', authenticateToken, async (req, res) => {
         SELECT * FROM Servers WHERE id = ${id}
       `;
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: 'Cập nhật server thành công',
         server: updatedServer.recordset[0]
       });
     } else {
-      res.status(404).json({ 
-        success: false, 
-        message: 'Không tìm thấy server' 
+      res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy server'
       });
     }
   } catch (error) {
     console.error('Error updating server:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Không thể cập nhật server' 
+    res.status(500).json({
+      success: false,
+      message: 'Không thể cập nhật server'
     });
   }
 });
@@ -1100,9 +1101,9 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   //console.log(`✅ Server running at http://localhost:${PORT}`);
-  
+
   // ❌ Bỏ hoặc comment phần này nếu không muốn dùng ngrok
-  
+
   // ngrok.connect(PORT).then(url => {
   //   const ngrokRef = ref(database, 'ngrok');
   //   set(ngrokRef, { url }).then(() => {
@@ -1113,5 +1114,5 @@ app.listen(PORT, () => {
   // }).catch(error => {
   //   console.error('❌ Error connecting to ngrok:', error);
   // });
-  
+
 });
