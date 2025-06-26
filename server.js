@@ -751,64 +751,74 @@ app.get('/server/:serverName/admin', authenticateToken, async (req, res) => {
 });
 
 // Cron job để xóa tin nhắn theo thời gian của từng server
-cron.schedule('* * * * *', async () => { // Chạy mỗi phút để kiểm tra
+cron.schedule('* * * * *', async () => {
+  console.log("⏰ Cron job chạy lúc:", new Date().toISOString());
+
   try {
     const pool = await sql.connect(dbConfig);
+    console.log("✅ Kết nối SQL thành công");
 
-    // Lấy danh sách server và thời gian xóa của chúng
     const serverResult = await pool.request().query('SELECT id, name, time_delete FROM Servers');
     const servers = serverResult.recordset;
+    console.log(`📋 Có ${servers.length} server(s) cần kiểm tra`);
 
-    const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMinute = currentTime.getMinutes();
-    const currentTimeString = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+    const now = new Date();
+    const currentHour = now.getUTCHours();     // dùng UTC vì EC2 là UTC
+    const currentMinute = now.getUTCMinutes();
+    const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
 
     for (const server of servers) {
       if (!server.time_delete) {
         continue;
       }
 
-      // Lấy thời gian từ database
       const serverTime = new Date(server.time_delete);
       const serverHour = serverTime.getUTCHours();
       const serverMinute = serverTime.getUTCMinutes();
-      const serverTimeString = `${serverHour.toString().padStart(2, '0')}:${serverMinute.toString().padStart(2, '0')}`;
+      const serverTimeStr = `${serverHour.toString().padStart(2, '0')}:${serverMinute.toString().padStart(2, '0')}`;
 
-      // So sánh chính xác giờ và phút
+      console.log(`🔍 Server ${server.name} (${server.id}): ${serverTimeStr} vs hiện tại ${currentTimeStr}`);
+
       if (serverHour === currentHour && serverMinute === currentMinute) {
-        // Lấy danh sách ảnh cần xóa
+        console.log(`🧹 Đang xóa dữ liệu server ${server.id}...`);
+
+        // 1. Lấy ảnh
         const imagesResult = await pool.request()
           .input('serverId', sql.Int, server.id)
           .query('SELECT image_url FROM Messages WHERE server_id = @serverId AND image_url IS NOT NULL');
 
-        // Xóa các file ảnh
         for (const image of imagesResult.recordset) {
           if (image.image_url) {
-            // Lấy tên file từ URL đầy đủ
             const fileName = image.image_url.split('/').pop();
-            // Kiểm tra xem file có thuộc server này không
             if (fileName.startsWith(`server_${server.id}_`)) {
               const imagePath = path.join(__dirname, 'public/uploads', fileName);
-              try {
-                fs.unlinkSync(imagePath);
-              } catch (error) {
-                console.error(`Error deleting image ${imagePath}:`, error);
+              if (fs.existsSync(imagePath)) {
+                try {
+                  fs.unlinkSync(imagePath);
+                  console.log(`🗑️ Đã xóa ảnh: ${fileName}`);
+                } catch (error) {
+                  console.error(`❌ Lỗi xóa ảnh ${fileName}:`, error.message);
+                }
+              } else {
+                console.warn(`⚠️ Ảnh không tồn tại: ${fileName}`);
               }
             }
           }
         }
 
-        // Xóa tin nhắn của server cụ thể
-        const deleteResult = await pool.request()
+        // 2. Xóa tin nhắn
+        await pool.request()
           .input('serverId', sql.Int, server.id)
           .query('DELETE FROM Messages WHERE server_id = @serverId');
+
+        console.log(`✅ Đã xóa toàn bộ tin nhắn cho server ${server.id}`);
       }
     }
   } catch (error) {
-    console.error("❌ Lỗi khi xóa tin nhắn:", error);
+    console.error("❌ Lỗi trong cron job:", error.stack || error.message || error);
   }
 });
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyBX2sYalQKoq7O2yeMzHJYdtnSF3BCuSTc",
